@@ -1,11 +1,16 @@
 package main
 
 import (
-	"encoding/json"
+	"database/sql"
+	_ "database/sql"
 	"github.com/gorilla/mux"
+	"github.com/lib/pq"
+	_ "github.com/lib/pq"
+	"github.com/subosito/gotenv"
+	_ "github.com/subosito/gotenv"
 	"log"
 	"net/http"
-	"strconv"
+	"os"
 )
 
 type Book struct {
@@ -16,16 +21,32 @@ type Book struct {
 }
 
 var books []Book
+var db *sql.DB
+
+func init() {
+	gotenv.Load()
+}
+
+func logFatal(err error) {
+	if err != nil {
+		log.Fatal(err)
+	}
+}
 
 func main() {
-	router := mux.NewRouter()
 
-	books = append(books,
-		Book{ID: 1, Title: "Golang pointers", Author: "Mr. Golang", Year: "2010"},
-		Book{ID: 2, Title: "Goroutines", Author: "Mr. Goroutine", Year: "2011"},
-		Book{ID: 3, Title: "Golang routers", Author: "Mr. Router", Year: "2012"},
-		Book{ID: 4, Title: "Golang concurrency", Author: "Mr. Currency", Year: "2013"},
-		Book{ID: 5, Title: "Golang good parts", Author: "Mr. Good", Year: "2014"})
+	pgUrl, err := pq.ParseURL(os.Getenv("URL"))
+	logFatal(err)
+
+	db, err = sql.Open("postgres", pgUrl)
+	logFatal(err)
+
+	err = db.Ping()
+	logFatal(err)
+
+	log.Println(pgUrl)
+
+	router := mux.NewRouter()
 
 	router.HandleFunc("/books", getBooks).Methods("GET")
 	router.HandleFunc("/books/{id}", getBook).Methods("GET")
@@ -37,51 +58,21 @@ func main() {
 }
 
 func getBooks(w http.ResponseWriter, r *http.Request) {
-	json.NewEncoder(w).Encode(books)
+
 }
 
 func getBook(w http.ResponseWriter, r *http.Request) {
-	params := mux.Vars(r)
 
-	id, _ := strconv.Atoi(params["id"])
-
-	for _, book := range books {
-		if book.ID == id {
-			json.NewEncoder(w).Encode(&book)
-		}
-	}
 }
 
 func addBook(w http.ResponseWriter, r *http.Request) {
-	var book Book
-	json.NewDecoder(r.Body).Decode(&book)
 
-	books = append(books, book)
-
-	json.NewEncoder(w).Encode(books)
 }
 
 func updateBook(w http.ResponseWriter, r *http.Request) {
-	var book Book
-	json.NewDecoder(r.Body).Decode(&book)
 
-	for i, item := range books {
-		if item.ID == book.ID {
-			books[i] = book
-		}
-	}
-
-	json.NewEncoder(w).Encode(books)
 }
 
 func removeBook(w http.ResponseWriter, r *http.Request) {
-	params := mux.Vars(r)
-	id, _ := strconv.Atoi(params["id"])
 
-	for i, item := range books {
-		if item.ID == id {
-			books = append(books[:i], books[i+1:]...)
-		}
-	}
-	json.NewEncoder(w).Encode(books)
 }
